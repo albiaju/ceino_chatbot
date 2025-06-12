@@ -9,7 +9,7 @@ import string
 
 load_dotenv()
 
-from task1 import generate_chatgpt_response
+from Task1 import generate_chatgpt_response
 
 OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
