@@ -1,9 +1,9 @@
 requests
 python-dotenv
-langchain
+langchain~=0.3.25
 langchain-openai
 openai
-fastapi
+fastapi~=0.115.12
 uvicorn
 requests
 python-dotenv
@@ -11,3 +11,5 @@ langchain
 langchain-openai
 openai
 pydantic
+
+langchain-community~=0.3.24

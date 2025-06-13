@@ -1,20 +1,13 @@
-from typing import Union
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from dotenv import load_dotenv
+from Task1 import generate_pdf_qa_agent, chat_with_pdf_agent
 import os
-import requests
-import string
-
-load_dotenv()
-
-from Task1 import generate_chatgpt_response
-
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
 
 app = FastAPI()
 
+# Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -23,85 +16,39 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class ChatRequest(BaseModel):
-    question: str
-    user: Union[str, None] = "Anonymous"
-
-def is_weather_query(question: str) -> bool:
-    keywords = ["weather", "temperature", "forecast", "rain", "snow", "humidity"]
-    return any(word in question.lower() for word in keywords)
-
-def get_weather_response(question: str) -> str:
-    tokens = question.lower().split()
-    prepositions = ["in", "at", "for"]
-    city = None
-
-    for prep in prepositions:
-        if prep in tokens:
-            idx = tokens.index(prep)
-            if idx + 1 < len(tokens):
-                raw_city = tokens[idx + 1]
-                city = raw_city.translate(str.maketrans('', '', string.punctuation))
-                break
-
-    if not city:
-        return "Please specify a city for the weather information."
-
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
-    try:
-        res = requests.get(url)
-        data = res.json()
-        if data.get("cod") != 200:
-            return f"Could not get weather data for '{city}'. Please check the city name."
-
-        weather_desc = data["weather"][0]["description"]
-        temp = data["main"]["temp"]
-        humidity = data["main"]["humidity"]
-        return f"The weather in {city.title()} is currently {weather_desc} with a temperature of {temp}°C and humidity of {humidity}%."
-    except Exception as e:
-        return f"Failed to get weather data due to: {e}"
+UPLOAD_DIR = "uploaded_pdfs"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @app.on_event("startup")
 async def startup_event():
-    print("FastAPI running at http://127.0.0.1:8000")
-    print("Swagger: http://127.0.0.1:8000/docs")
+    print("\n✅ FastAPI server started!")
+    print("🔗 API:  http://127.0.0.1:8000")
+    print("📘 Docs: http://127.0.0.1:8000/docs\n")
 
-@app.get("/")
-def read_root():
-    return {"message": "Weather + Chatbot API is running."}
+# Chat request model
+class ChatRequest(BaseModel):
+    filename: str
+    query: str
 
-@app.get("/chat/{question}")
-def get_chat_response(question: str, user: Union[str, None] = None):
+# Endpoint for PDF upload
+@app.post("/upload_pdf/")
+async def upload_pdf(file: UploadFile = File(...)):
     try:
-        if is_weather_query(question):
-            answer = get_weather_response(question)
-        else:
-            answer = generate_chatgpt_response(question)
-        return {
-            "user": user or "Anonymous",
-            "question": question,
-            "answer": answer
-        }
+        file_path = os.path.join(UPLOAD_DIR, file.filename)
+        with open(file_path, "wb") as f:
+            f.write(await file.read())
+        generate_pdf_qa_agent(file_path)
+        return JSONResponse(content={"message": "PDF uploaded and agent initialized.", "filename": file.filename})
     except Exception as e:
-        return {
-            "error": str(e),
-            "answer": "An error occurred while processing your request."
-        }
+        print(f"❌ Error: {e}")
+        return JSONResponse(content={"error": str(e)}, status_code=500)
 
-@app.put("/chat")
-def put_chat_response(chat: ChatRequest):
+# Endpoint for querying PDF (boxed input in Swagger)
+@app.post("/chat_pdf/")
+async def chat_pdf(request: ChatRequest = Body(...)):
     try:
-        if is_weather_query(chat.question):
-            answer = get_weather_response(chat.question)
-        else:
-            answer = generate_chatgpt_response(chat.question)
-        return {
-            "user": chat.user or "Anonymous",
-            "question": chat.question,
-            "answer": answer
-        }
+        answer = chat_with_pdf_agent(request.filename, request.query)
+        return JSONResponse(content={"answer": answer})
     except Exception as e:
-        return {
-            "error": str(e),
-            "answer": "An error occurred while processing your request."
-        }
+        print(f"❌ Chat error: {e}")
+        return JSONResponse(content={"answer": "Query failed"}, status_code=500)
