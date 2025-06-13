@@ -1,76 +1,101 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 
 function App() {
+  const [pdfFile, setPdfFile] = useState(null);
+  const [filename, setFilename] = useState('');
+  const [uploadStatus, setUploadStatus] = useState('');
   const [question, setQuestion] = useState('');
   const [chatLog, setChatLog] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatLog, loading]);
+
+  const handleUpload = async () => {
+    if (!pdfFile) {
+      setUploadStatus('⚠️ Please choose a PDF');
+      return;
+    }
+    setUploadStatus('Uploading...');
+    const fd = new FormData();
+    fd.append('file', pdfFile);
+
+    try {
+      const res = await fetch('http://localhost:8000/upload_pdf/', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        setFilename(data.filename);
+        setUploadStatus('✅ PDF uploaded');
+      } else {
+        throw new Error(data.error || 'Upload failed');
+      }
+    } catch (e) {
+      setUploadStatus(`❌ ${e.message}`);
+    }
+  };
 
   const sendMessage = async () => {
     if (!question.trim()) return;
-
-    const userMessage = { sender: 'user', text: question };
-    setChatLog((prevLog) => [...prevLog, userMessage]);
+    const userMsg = { sender: 'user', text: question };
+    setChatLog(prev => [...prev, userMsg]);
     setQuestion('');
     setLoading(true);
 
     try {
-      const response = await fetch(`http://127.0.0.1:8000/chat/${encodeURIComponent(question)}`);
-      const data = await response.json();
-
-      setTimeout(() => {
-        const botMessage = { sender: 'bot', text: data.answer };
-        setChatLog((prevLog) => [...prevLog, botMessage]);
-        setLoading(false);
-      }, 1500);
-    } catch (error) {
-      console.error('Error:', error);
-      setChatLog((prevLog) => [...prevLog, { sender: 'bot', text: 'Sorry, something went wrong.' }]);
+      const res = await fetch('http://localhost:8000/chat_pdf/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename, query: question })
+      });
+      const data = await res.json();
+      const botMsg = { sender: 'bot', text: data.answer };
+      setChatLog(prev => [...prev, botMsg]);
+    } catch {
+      setChatLog(prev => [...prev, { sender: 'bot', text: 'Error fetching answer.' }]);
+    } finally {
       setLoading(false);
     }
   };
 
   return (
     <>
-      <button className="chat-toggle-btn" onClick={() => setIsChatOpen(!isChatOpen)}>
-        💬
-      </button>
+      <button className="chat-toggle-btn" onClick={() => setIsChatOpen(o => !o)}>💬</button>
+      <div className={`chat-wrapper ${isChatOpen ? 'open' : ''}`}>
+        <div className="chat">
+          <h2>PDF Chatbot</h2>
 
-      <div className={`chat-container-wrapper ${isChatOpen ? 'open' : ''}`}>
-        <div className="chat-container">
-          <h1>Chatbot</h1>
-
-          <div className="chat-box">
-            {chatLog.map((msg, index) => (
-              <div className={`chat-msg ${msg.sender}`} key={index}>
-                {msg.sender === 'bot' && (
-                  <img className="chat-avatar" src="https://img.icons8.com/?size=100&id=WZolzyWpK1CQ&format=png&color=000000" alt="Bot" />
-                )}
-                <div className="chat-text">{msg.text}</div>
-                {msg.sender === 'user' && (
-                  <img className="chat-avatar" src="https://img.icons8.com/?size=100&id=7820&format=png&color=000000" alt="User" />
-                )}
+          {!filename ? (
+            <div className="upload-panel">
+              <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files[0])} />
+              <button onClick={handleUpload}>Upload</button>
+              {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
+            </div>
+          ) : (
+            <>
+              <div className="chat-area">
+                {chatLog.map((m, i) => (
+                  <div key={i} className={`msg ${m.sender}`}>
+                    <span>{m.text}</span>
+                  </div>
+                ))}
+                {loading && <div className="msg bot"><em>Typing...</em></div>}
+                <div ref={bottomRef} />
               </div>
-            ))}
-            {loading && (
-              <div className="chat-msg bot">
-                <img className="chat-avatar" src="https://img.icons8.com/?size=100&id=WZolzyWpK1CQ&format=png&color=000000" alt="Bot" />
-                <div className="chat-text"><em>Typing...</em></div>
+              <div className="input-area">
+                <input
+                  value={question}
+                  onChange={e => setQuestion(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && sendMessage()}
+                  placeholder="Ask something..."
+                />
+                <button onClick={sendMessage}>Send</button>
               </div>
-            )}
-          </div>
-
-          <div className="chat-input">
-            <input
-              type="text"
-              placeholder="Ask something..."
-              value={question}
-              onChange={(e) => setQuestion(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-            />
-            <button onClick={sendMessage}>Send</button>
-          </div>
+            </>
+          )}
         </div>
       </div>
     </>
@@ -79,3 +104,4 @@ function App() {
 
 
 export default App;
+
