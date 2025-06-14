@@ -1,105 +1,87 @@
-import React, { useState, useEffect, useRef } from 'react';
-import './App.css';
+import React, { useState, useRef } from 'react';
 
-function App() {
+function PDFUploader() {
   const [pdfFile, setPdfFile] = useState(null);
   const [filename, setFilename] = useState('');
-  const [uploadStatus, setUploadStatus] = useState('');
-  const [question, setQuestion] = useState('');
-  const [chatLog, setChatLog] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(true);
-  const bottomRef = useRef(null);
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [chatLog, loading]);
-
-  const handleUpload = async () => {
-    if (!pdfFile) {
-      setUploadStatus('⚠️ Please choose a PDF');
-      return;
-    }
-    setUploadStatus('Uploading...');
-    const fd = new FormData();
-    fd.append('file', pdfFile);
-
-    try {
-      const res = await fetch('http://localhost:8000/upload_pdf/', { method: 'POST', body: fd });
-      const data = await res.json();
-      if (res.ok) {
-        setFilename(data.filename);
-        setUploadStatus('✅ PDF uploaded');
-      } else {
-        throw new Error(data.error || 'Upload failed');
-      }
-    } catch (e) {
-      setUploadStatus(`❌ ${e.message}`);
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file && file.type === 'application/pdf') {
+      setPdfFile(file);
+    } else {
+      alert('Please select a PDF file');
     }
   };
 
-  const sendMessage = async () => {
-    if (!question.trim()) return;
-    const userMsg = { sender: 'user', text: question };
-    setChatLog(prev => [...prev, userMsg]);
-    setQuestion('');
-    setLoading(true);
+  const handleUpload = async () => {
+    if (!pdfFile) {
+      alert('Please select a PDF file first');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', pdfFile);
 
     try {
-      const res = await fetch('http://localhost:8000/chat_pdf/', {
+      console.log('Uploading file:', pdfFile.name);
+
+      const response = await fetch('http://localhost:8000/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename, query: question })
+        body: formData
       });
-      const data = await res.json();
-      const botMsg = { sender: 'bot', text: data.answer };
-      setChatLog(prev => [...prev, botMsg]);
-    } catch {
-      setChatLog(prev => [...prev, { sender: 'bot', text: 'Error fetching answer.' }]);
-    } finally {
-      setLoading(false);
+
+      console.log('Response status:', response.status);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.detail || 'Upload failed');
+      }
+
+      const data = await response.json();
+      setFilename(data.filename);
+      alert('PDF uploaded successfully!');
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(`Upload failed: ${error.message}`);
     }
   };
 
   return (
-    <>
-      <button className="chat-toggle-btn" onClick={() => setIsChatOpen(o => !o)}>💬</button>
-      <div className={`chat-wrapper ${isChatOpen ? 'open' : ''}`}>
-        <div className="chat">
-          <h2>PDF Chatbot</h2>
+    <div className="pdf-uploader">
+      <h2>PDF Chat Assistant</h2>
 
-          {!filename ? (
-            <div className="upload-panel">
-              <input type="file" accept="application/pdf" onChange={e => setPdfFile(e.target.files[0])} />
-              <button onClick={handleUpload}>Upload</button>
-              {uploadStatus && <div className="upload-status">{uploadStatus}</div>}
-            </div>
-          ) : (
-            <>
-              <div className="chat-area">
-                {chatLog.map((m, i) => (
-                  <div key={i} className={`msg ${m.sender}`}>
-                    <span>{m.text}</span>
-                  </div>
-                ))}
-                {loading && <div className="msg bot"><em>Typing...</em></div>}
-                <div ref={bottomRef} />
-              </div>
-              <div className="input-area">
-                <input
-                  value={question}
-                  onChange={e => setQuestion(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && sendMessage()}
-                  placeholder="Ask something..."
-                />
-                <button onClick={sendMessage}>Send</button>
-              </div>
-            </>
-          )}
-        </div>
+      <div className="upload-section">
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+        />
+        <button onClick={() => fileInputRef.current.click()}>
+          Select PDF
+        </button>
+
+        {pdfFile && (
+          <div className="file-info">
+            <p>Selected: {pdfFile.name}</p>
+            <p>Size: {(pdfFile.size / 1024).toFixed(2)} KB</p>
+          </div>
+        )}
+
+        <button onClick={handleUpload} disabled={!pdfFile}>
+          Upload & Process
+        </button>
       </div>
-    </>
+
+      {filename && (
+        <div className="upload-success">
+          <p>Ready to chat about: {filename}</p>
+        </div>
+      )}
+    </div>
   );
 }
 
-export default App;
+export default PDFUploader;
