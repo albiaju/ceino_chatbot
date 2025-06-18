@@ -72,7 +72,6 @@ def handle_general_question(question: str) -> str:
     return general_chat_chain.predict(input=question)
 
 
-# Run from terminal
 if __name__ == "__main__":
     print("🧠 Chat Mode (Type 'upload <path>' to load a PDF, or ask general questions directly)")
     print("📎 Example: upload sample.pdf\n")
