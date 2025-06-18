@@ -1,7 +1,7 @@
 requests
-python-dotenv
+python-dotenv~=1.1.0
 langchain~=0.3.25
-langchain-openai
+langchain-openai~=0.3.16
 openai
 fastapi~=0.115.12
 uvicorn
@@ -13,3 +13,6 @@ openai
 pydantic
 
 langchain-community~=0.3.24
+fitz~=0.0.1.dev2
+PyPDF2~=3.0.1
+langchain-core~=0.3.59
