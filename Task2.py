@@ -4,11 +4,11 @@ from typing import Optional
 import os
 import time
 
-from Task1 import PDFChatHandler, handle_general_question
+from Task1 import PDFChatHandler, handle_general_question  # Memory function imported
 
 app = FastAPI()
 
-# CORS setup
+# CORS setup for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -17,11 +17,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-pdf_chat_handler: Optional[PDFChatHandler] = None
+pdf_chat_handler: Optional[PDFChatHandler] = None  # Stores the current PDF session
 
 UPLOAD_DIR = "uploaded_pdfs"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
@@ -49,8 +49,10 @@ async def ask_question(question: str = Form(...)):
     global pdf_chat_handler
     try:
         if pdf_chat_handler:
+            # Ask PDF-related question using LangChain Agent
             answer = pdf_chat_handler.ask(question)
         else:
+            # Ask general question with memory-enabled chat
             answer = handle_general_question(question)
         return {"question": question, "answer": answer}
     except Exception as e:
