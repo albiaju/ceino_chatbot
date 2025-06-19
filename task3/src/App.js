@@ -31,10 +31,10 @@ function App() {
       });
 
       const data = await response.json();
-      const botMessage = { sender: 'bot', text: data.answer || data.error || "❌ No response." };
+      const botMessage = { sender: 'bot', text: data.answer || data.error || "No response." };
       setChatLog((prevLog) => [...prevLog, botMessage]);
     } catch (error) {
-      setChatLog((prevLog) => [...prevLog, { sender: 'bot', text: '❌ Something went wrong.' }]);
+      setChatLog((prevLog) => [...prevLog, { sender: 'bot', text: 'Something went wrong.' }]);
     } finally {
       setLoading(false);
     }
@@ -58,12 +58,12 @@ function App() {
       });
       const data = await res.json();
       const message = data.message
-        ? `✅ PDF uploaded: *${file.name}*`
-        : `❌ Upload failed: ${data.error || "Unknown error"}`;
+        ? `PDF uploaded: *${file.name}*`
+        : `Upload failed: ${data.error || "Unknown error"}`;
 
       setChatLog((prevLog) => [...prevLog, { sender: 'bot', text: message }]);
     } catch (error) {
-      setChatLog((prevLog) => [...prevLog, { sender: 'bot', text: "❌ Failed to upload PDF." }]);
+      setChatLog((prevLog) => [...prevLog, { sender: 'bot', text: "Failed to upload PDF." }]);
     }
   };
 

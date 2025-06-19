@@ -40,9 +40,9 @@ async def upload_pdf(file: UploadFile = File(...)):
     global pdf_chat_handler
     try:
         pdf_chat_handler = PDFChatHandler(file_path)
-        return {"message": f"✅ PDF uploaded and saved as '{filename}'."}
+        return {"message": f"PDF uploaded and saved as '{filename}'."}
     except Exception as e:
-        return {"error": f"❌ Failed to process PDF: {str(e)}"}
+        return {"error": f"Failed to process PDF: {str(e)}"}
 
 @app.post("/ask")
 async def ask_question(question: str = Form(...)):
