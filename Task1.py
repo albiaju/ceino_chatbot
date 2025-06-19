@@ -73,34 +73,34 @@ def handle_general_question(question: str) -> str:
 
 
 if __name__ == "__main__":
-    print("🧠 Chat Mode (Type 'upload <path>' to load a PDF, or ask general questions directly)")
-    print("📎 Example: upload sample.pdf\n")
+    print("Chat Mode (Type 'upload <path>' to load a PDF, or ask general questions directly)")
+    print("Example: upload sample.pdf\n")
 
     current_handler = None  # type: Optional[PDFChatHandler]
 
     while True:
-        user_input = input("🧑 You: ").strip()
+        user_input = input("You: ").strip()
         if not user_input:
             continue
         if user_input.lower() == "exit":
-            print("👋 Chat ended.")
+            print("Chat ended.")
             break
         elif user_input.lower().startswith("upload "):
             pdf_path = user_input[7:].strip()
             if not os.path.exists(pdf_path):
-                print("❌ File not found:", pdf_path)
+                print("File not found:", pdf_path)
                 continue
             try:
                 current_handler = PDFChatHandler(pdf_path)
-                print(f"✅ PDF '{os.path.basename(pdf_path)}' loaded. Ask questions related to it!")
+                print(f"PDF '{os.path.basename(pdf_path)}' loaded. Ask questions related to it!")
             except Exception as e:
-                print("❌ Failed to load PDF:", str(e))
+                print("Failed to load PDF:", str(e))
         else:
             try:
                 if current_handler:
                     response = current_handler.ask(user_input)
                 else:
                     response = handle_general_question(user_input)
-                print("🤖 AI:", response)
+                print("AI:", response)
             except Exception as e:
-                print("⚠️ Error:", e)
+                print("Error:", e)
