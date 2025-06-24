@@ -206,6 +206,6 @@ This project is brought to you by a dedicated team of AI engineers and developer
 
 
 
-Built with by [Albi Aju](https://github.com/albiaju) & [Jeswin James Binu](https://github.com/jeswinjamesbinu2262084)
+Built  by [Albi Aju](https://github.com/albiaju) & [Jeswin James Binu](https://github.com/jeswinjamesbinu2262084)
 
 </div>
