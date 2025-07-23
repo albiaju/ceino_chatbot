@@ -1,22 +1,14 @@
-
-
-from typing import Union
-from fastapi import FastAPI
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from dotenv import load_dotenv
+from typing import Optional
 import os
-import requests
-import string
+import time
 
-load_dotenv()
-
-from Task1 import generate_chatgpt_response
-
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY")
+from Task1 import PDFChatHandler, handle_general_question  # Memory function imported
 
 app = FastAPI()
 
+# CORS setup for frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -25,88 +17,43 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class ChatRequest(BaseModel):
-    question: str
-    user: Union[str, None] = "Anonymous"
+pdf_chat_handler: Optional[PDFChatHandler] = None  # Stores the current PDF session
 
-def is_weather_query(question: str) -> bool:
-    keywords = ["weather", "temperature", "forecast", "rain", "snow", "humidity"]
-    return any(word in question.lower() for word in keywords)
+UPLOAD_DIR = "uploaded_pdfs"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB limit
 
-def get_weather_response(question: str) -> str:
-    tokens = question.lower().split()
-    prepositions = ["in", "at", "for"]
-    city = None
+@app.post("/upload")
+async def upload_pdf(file: UploadFile = File(...)):
+    contents = await file.read()
 
-    for prep in prepositions:
-        if prep in tokens:
-            idx = tokens.index(prep)
-            if idx + 1 < len(tokens):
-                raw_city = tokens[idx + 1]
-                city = raw_city.translate(str.maketrans('', '', string.punctuation))
-                break
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=413, detail="File too large. Max 10 MB allowed.")
 
-    if not city:
-        return "Please specify a city for the weather information."
+    timestamp = int(time.time())
+    filename = f"{timestamp}_{file.filename}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
 
-    url = f"https://api.openweathermap.org/data/2.5/weather?q={city}&appid={OPENWEATHER_API_KEY}&units=metric"
+    with open(file_path, "wb") as f:
+        f.write(contents)
+
+    global pdf_chat_handler
     try:
-        res = requests.get(url)
-        data = res.json()
-        if data.get("cod") != 200:
-            return f"Could not get weather data for '{city}'. Please check the city name."
-
-        weather_desc = data["weather"][0]["description"]
-        temp = data["main"]["temp"]
-        humidity = data["main"]["humidity"]
-        return f"The weather in {city.title()} is currently {weather_desc} with a temperature of {temp}°C and humidity of {humidity}%."
+        pdf_chat_handler = PDFChatHandler(file_path)
+        return {"message": f"PDF uploaded and saved as '{filename}'."}
     except Exception as e:
-        return f"Failed to get weather data due to: {e}"
+        return {"error": f"Failed to process PDF: {str(e)}"}
 
-@app.on_event("startup")
-async def startup_event():
-    print("FastAPI running at http://127.0.0.1:8000")
-    print("Swagger: http://127.0.0.1:8000/docs")
-
-@app.get("/")
-def read_root():
-    return {"message": "Weather + Chatbot API is running."}
-
-@app.get("/chat/{question}")
-def get_chat_response(question: str, user: Union[str, None] = None):
+@app.post("/ask")
+async def ask_question(question: str = Form(...)):
+    global pdf_chat_handler
     try:
-        if is_weather_query(question):
-            answer = get_weather_response(question)
+        if pdf_chat_handler:
+            # Ask PDF-related question using LangChain Agent
+            answer = pdf_chat_handler.ask(question)
         else:
-            answer = generate_chatgpt_response(question)
-        return {
-            "user": user or "Anonymous",
-            "question": question,
-            "answer": answer
-        }
+            # Ask general question with memory-enabled chat
+            answer = handle_general_question(question)
+        return {"question": question, "answer": answer}
     except Exception as e:
-        return {
-            "error": str(e),
-            "answer": "An error occurred while processing your request."
-        }
-
-@app.put("/chat")
-def put_chat_response(chat: ChatRequest):
-    try:
-        if is_weather_query(chat.question):
-            answer = get_weather_response(chat.question)
-        else:
-            answer = generate_chatgpt_response(chat.question)
-        return {
-            "user": chat.user or "Anonymous",
-            "question": chat.question,
-            "answer": answer
-        }
-    except Exception as e:
-        return {
-            "error": str(e),
-            "answer": "An error occurred while processing your request."
-        }
-
-
-
+        return {"error": str(e)}
